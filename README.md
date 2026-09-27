@@ -11,7 +11,7 @@ Automate and enhance your music experience in Sword of Justice game with MIDI su
 
 ⏱️ BPM Control: Set custom tempo for perfect timing with your gameplay
 
-🎼 Auto-Tune: Automatically adjust out-of-range MIDI notes to playable octaves
+🎼 Auto-Tune: Automatically adjust out-of-range MIDI notes to playable octaves and have 21, 36 and 50 keys
 
 🔄 Real-time Conversion: Seamless MIDI to in-game music conversion
 
