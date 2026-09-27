@@ -15,14 +15,6 @@ Automate and enhance your music experience in Sword of Justice game with MIDI su
 
 🔄 Real-time Conversion: Seamless MIDI to in-game music conversion
 
-
-## Installation
-
--Download the latest release from the [Releases page](https://github.com/reinshit/Sword-of-Justice-Music-Player/releases)
-
--Extract Zip file
-
--Run SoJMusicPlayer.exe
 ## License
 
 [MIT](https://choosealicense.com/licenses/mit/)
