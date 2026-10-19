@@ -12,7 +12,7 @@ from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QIcon, QKeySequence, QFont
 import Player as GZP
 import SheetMaker as GSM
-from threads import PlaybackThread
+from threads import PlaybackThread, list_visible_windows
 from widgets import NoteVisualization
 from hotkeys import HotkeyManager
 from themes import get_theme
@@ -38,12 +38,14 @@ class ModernGUI(QMainWindow):
         self.is_playing = False
         self.is_paused = False
         self.key_adds = []
+        self.preferred_target_window_title = None
         self.settings_file = "settings.json"
         self.hotkey_manager = HotkeyManager()
         
         self.init_ui()
         
         self.load_settings()
+        self.refresh_target_windows(self.preferred_target_window_title)
         self.apply_theme()
         self.setup_shortcuts()
         self.setup_global_hotkeys()
@@ -167,6 +169,20 @@ class ModernGUI(QMainWindow):
         settings_layout.addStretch()  
         
         controls_layout.addLayout(settings_layout)
+
+        target_layout = QHBoxLayout()
+        target_layout.addWidget(QLabel("Target window:"))
+        self.combo_target_window = QComboBox()
+        self.combo_target_window.setMinimumWidth(240)
+        target_layout.addWidget(self.combo_target_window)
+
+        self.btn_refresh_windows = QPushButton("Refresh")
+        self.btn_refresh_windows.clicked.connect(
+            lambda: self.refresh_target_windows()
+        )
+        target_layout.addWidget(self.btn_refresh_windows)
+        target_layout.addStretch()
+        controls_layout.addLayout(target_layout)
         
         options_layout = QHBoxLayout()
         self.check_out_range = QCheckBox("Allow out-of-range notes")
@@ -186,6 +202,26 @@ class ModernGUI(QMainWindow):
         controls_layout.addLayout(options_layout)
         
         layout.addWidget(controls)
+
+    def refresh_target_windows(self, preferred_title=None):
+        """Reload selectable visible windows while preserving the current choice."""
+        if preferred_title is None:
+            preferred_title = self.combo_target_window.currentText()
+
+        windows = list_visible_windows(excluded_hwnd=int(self.winId()))
+        self.combo_target_window.clear()
+        for hwnd, title in windows:
+            self.combo_target_window.addItem(title, hwnd)
+
+        preferred_index = self.combo_target_window.findText(
+            preferred_title, Qt.MatchExactly
+        )
+        if preferred_index >= 0:
+            self.combo_target_window.setCurrentIndex(preferred_index)
+
+        self.combo_target_window.setEnabled(bool(windows))
+        if not windows and hasattr(self, 'label_status'):
+            self.label_status.setText("❌ No visible target windows found")
 
     def key_mode_changed(self, _state):
         """Recalculate available transpositions when the keyboard layout changes."""
@@ -538,9 +574,14 @@ class ModernGUI(QMainWindow):
         allow_out = self.check_out_range.isChecked()
         use_36_keys = self.check_36_keys_mode.isChecked()
         use_50_keys = self.check_50_keys_mode.isChecked()
+        target_hwnd = self.combo_target_window.currentData()
+        if target_hwnd is None:
+            self.label_status.setText("❌ Select a visible target window first")
+            return
         
         self.playThread = PlaybackThread(
-            file_name, key_add, bpm, allow_out, use_36_keys, use_50_keys
+            file_name, key_add, bpm, allow_out, use_36_keys, use_50_keys,
+            target_hwnd
         )
         self.playThread.progress_signal.connect(self.update_progress)
         self.playThread.note_played_signal.connect(self.note_viz.add_note)
@@ -559,6 +600,8 @@ class ModernGUI(QMainWindow):
         self.spin_wait.setEnabled(False)
         self.btn_add_midi.setEnabled(False)
         self.btn_refresh.setEnabled(False)
+        self.combo_target_window.setEnabled(False)
+        self.btn_refresh_windows.setEnabled(False)
         self.label_status.setText("▶ Playing...")
     
     def pause_clicked(self):
@@ -594,6 +637,8 @@ class ModernGUI(QMainWindow):
         self.spin_wait.setEnabled(True)
         self.btn_add_midi.setEnabled(True)
         self.btn_refresh.setEnabled(True)
+        self.combo_target_window.setEnabled(self.combo_target_window.count() > 0)
+        self.btn_refresh_windows.setEnabled(True)
         self.progress_bar.setValue(0)
         self.label_time.setText("00:00 / 00:00")
         self.label_status.setText("✓ Playback finished")
@@ -655,6 +700,9 @@ class ModernGUI(QMainWindow):
                     self.check_50_keys_mode.setChecked(
                         settings.get('use_50_keys', False)
                     )
+                    self.preferred_target_window_title = settings.get(
+                        'target_window_title'
+                    )
                     
                     if 'geometry' in settings:
                         self.restoreGeometry(bytes.fromhex(settings['geometry']))
@@ -668,6 +716,7 @@ class ModernGUI(QMainWindow):
             'wait_time': self.spin_wait.value(),
             'use_36_keys': self.check_36_keys_mode.isChecked(),
             'use_50_keys': self.check_50_keys_mode.isChecked(),
+            'target_window_title': self.combo_target_window.currentText(),
             'geometry': self.saveGeometry().toHex().data().decode()
         }
         
